@@ -5,9 +5,24 @@ const userSchema = new Schema(
   {
     username: {
       type: String,
-      // unique: true -> Ideally, should be unique, but its up to you
+      unique: true, // -> Ideally, should be unique, but its up to you
+      required: true,
+      min: 3,
+      max: 16,
     },
-    password: String,
+    name: {
+      type: String,
+      max: 50,
+    },
+    password: {
+      type: String,
+      required: true,
+    },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+    },
   },
   {
     // this second object adds extra properties: `createdAt` and `updatedAt`
@@ -15,6 +30,7 @@ const userSchema = new Schema(
   }
 );
 
-const User = model("User", userSchema);
+const userCollectionName = "User";
+const User = model(userCollectionName, userSchema);
 
-module.exports = User;
+module.exports = { userCollectionName, User };
