@@ -29,4 +29,13 @@ dashboardRouter.get("/", (req, res) => {
   });
 });
 
+dashboardRouter.get("/:slug", (req, res) => {
+  const goal = FAKE_GOALS.find((goal) => goal.slug === req.params.slug);
+
+  res.json({ goal });
+});
+
 module.exports = dashboardRouter;
+
+// https://www.skyscanner.nl/transport/vluchten/ams/krk/221006/221013/?adults=1&adultsv2=1&cabinclass=economy&children=0&childrenv2=&destinationentityid=27543787&inboundaltsenabled=false&infants=0&originentityid=27536561&outboundaltsenabled=false&preferdirects=false&ref=home&rtn=1
+// router.get('/vlucthen/:origin/:goal)
