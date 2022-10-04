@@ -8,27 +8,33 @@ const mongoose = require("mongoose");
 const saltRounds = 10;
 
 // Require the User model in order to interact with the database
-const User = require("../models/User.model");
+const { User } = require("../models/User.model");
 
 // Require necessary (isLoggedOut and isLoggedIn) middleware in order to control access to specific routes
 const isLoggedOut = require("../middleware/isLoggedOut");
 const isLoggedIn = require("../middleware/isLoggedIn");
 
-router.get("/signup", isLoggedOut, (req, res) => {
-  res.render("auth/signup");
-});
+const jwt = require("jsonwebtoken");
 
-router.post("/signup", isLoggedOut, (req, res) => {
-  const { username, password } = req.body;
+router.post("/signup", (req, res) => {
+  const { username, password, email, name } = req.body;
+  console.log("username:", username);
 
   if (!username) {
-    return res.status(400).render("auth/signup", {
+    return res.status(400).json({
       errorMessage: "Please provide your username.",
     });
   }
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+  if (!emailRegex.test(email)) {
+    res.status(418).json({ errorMessage: "Provide a valid email address." });
+    return;
+  }
+
   if (password.length < 8) {
-    return res.status(400).render("auth/signup", {
+    return res.status(400).json({
       errorMessage: "Your password needs to be at least 8 characters long.",
     });
   }
@@ -49,9 +55,7 @@ router.post("/signup", isLoggedOut, (req, res) => {
   User.findOne({ username }).then((found) => {
     // If the user is found, send the message username is taken
     if (found) {
-      return res
-        .status(400)
-        .render("auth/signup", { errorMessage: "Username already taken." });
+      return res.status(400).json({ errorMessage: "Username already taken." });
     }
 
     // if user is not found, create a new user - start with hashing the password
@@ -63,27 +67,33 @@ router.post("/signup", isLoggedOut, (req, res) => {
         return User.create({
           username,
           password: hashedPassword,
+          email,
+          name,
         });
       })
       .then((user) => {
         // Bind the user to the session object
-        req.session.user = user;
-        res.redirect("/");
+        const token = jwt.sign(
+          { _id: user._id, username: user.username },
+          // TODO: Comeback in a few hours
+          "giasdfkgjlhdfslgkjhsdfgkljsdfhgksdl",
+          { algorithm: "HS256", expiresIn: "12h" }
+        );
+        console.log("---------->", token);
+
+        res.json({ user, token });
       })
       .catch((error) => {
         if (error instanceof mongoose.Error.ValidationError) {
-          return res
-            .status(400)
-            .render("auth/signup", { errorMessage: error.message });
+          return res.status(400).json({ errorMessage: error.message });
         }
         if (error.code === 11000) {
-          return res
-            .status(400)
-            .render("auth/signup", { errorMessage: "Username need to be unique. The username you chose is already in use." });
+          return res.status(400).json({
+            errorMessage:
+              "Username need to be unique. The username you chose is already in use.",
+          });
         }
-        return res
-          .status(500)
-          .render("auth/signup", { errorMessage: error.message });
+        return res.status(500).json({ errorMessage: error.message });
       });
   });
 });
@@ -104,9 +114,9 @@ router.post("/login", isLoggedOut, (req, res, next) => {
   // Here we use the same logic as above
   // - either length based parameters or we check the strength of a password
   if (password.length < 8) {
-    return res
-      .status(400)
-      .render("auth/login", { errorMessage: "Your password needs to be at least 8 characters long." });
+    return res.status(400).render("auth/login", {
+      errorMessage: "Your password needs to be at least 8 characters long.",
+    });
   }
 
   // Search the database for a user with the username submitted in the form
@@ -148,7 +158,7 @@ router.get("/logout", isLoggedIn, (req, res) => {
         .status(500)
         .render("auth/logout", { errorMessage: err.message });
     }
-    
+
     res.redirect("/");
   });
 });
