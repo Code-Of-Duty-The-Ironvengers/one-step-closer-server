@@ -1,4 +1,8 @@
-const router = require("express").Router();
+// const {Router} = require('express')
+// const router = Router()
+// const router = require("express").Router();
+const express = require("express");
+const router = express.Router();
 
 // ℹ️ Handles password encryption
 const bcrypt = require("bcrypt");
@@ -44,7 +48,7 @@ router.post("/signup", (req, res) => {
   const regex = /(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}/;
 
   if (!regex.test(password)) {
-    return res.status(400).render("signup", {
+    return res.status(400).json({
       errorMessage:
         "Password needs to have at least 8 chars and must contain at least one number, one lowercase and one uppercase letter.",
     });
@@ -75,8 +79,7 @@ router.post("/signup", (req, res) => {
         // Bind the user to the session object
         const token = jwt.sign(
           { _id: user._id, username: user.username },
-          // TODO: Comeback in a few hours
-          "giasdfkgjlhdfslgkjhsdfgkljsdfhgksdl",
+          process.env.TOKEN_SECRET,
           { algorithm: "HS256", expiresIn: "12h" }
         );
         console.log("---------->", token);
@@ -98,23 +101,19 @@ router.post("/signup", (req, res) => {
   });
 });
 
-router.get("/login", isLoggedOut, (req, res) => {
-  res.render("auth/login");
-});
-
 router.post("/login", isLoggedOut, (req, res, next) => {
   const { username, password } = req.body;
 
   if (!username) {
     return res
       .status(400)
-      .render("auth/login", { errorMessage: "Please provide your username." });
+      .json({ errorMessage: "Please provide your username." });
   }
 
   // Here we use the same logic as above
   // - either length based parameters or we check the strength of a password
   if (password.length < 8) {
-    return res.status(400).render("auth/login", {
+    return res.status(400).json({
       errorMessage: "Your password needs to be at least 8 characters long.",
     });
   }
@@ -124,22 +123,24 @@ router.post("/login", isLoggedOut, (req, res, next) => {
     .then((user) => {
       // If the user isn't found, send the message that user provided wrong credentials
       if (!user) {
-        return res
-          .status(400)
-          .render("auth/login", { errorMessage: "Wrong credentials." });
+        return res.status(400).json({ errorMessage: "Wrong credentials." });
       }
 
       // If user is found based on the username, check if the in putted password matches the one saved in the database
       bcrypt.compare(password, user.password).then((isSamePassword) => {
         if (!isSamePassword) {
-          return res
-            .status(400)
-            .render("auth/login", { errorMessage: "Wrong credentials." });
+          return res.status(400).json({ errorMessage: "Wrong credentials." });
         }
 
-        req.session.user = user;
+        const token = jwt.sign(
+          { _id: user._id, username: user.username },
+          process.env.TOKEN_SECRET,
+          { algorithm: "HS256", expiresIn: "12h" }
+        );
+        console.log("---------->", token);
+
+        res.json({ user, token });
         // req.session.user = user._id; // ! better and safer but in this case we saving the entire user object
-        return res.redirect("/");
       });
     })
 
@@ -147,16 +148,22 @@ router.post("/login", isLoggedOut, (req, res, next) => {
       // in this case we are sending the error handling to the error handling middleware that is defined in the error handling file
       // you can just as easily run the res.status that is commented out below
       next(err);
-      // return res.status(500).render("auth/login", { errorMessage: err.message });
+      // return res.status(500).json({ errorMessage: err.message });
     });
+});
+
+router.post("/get-me", (req, res) => {
+  console.log(req.body);
+  const { token } = req.body;
+
+  const { _id } = jwt.decode(token);
+  User.findById(_id).then((user) => res.json({ user }));
 });
 
 router.get("/logout", isLoggedIn, (req, res) => {
   req.session.destroy((err) => {
     if (err) {
-      return res
-        .status(500)
-        .render("auth/logout", { errorMessage: err.message });
+      return res.status(500).json({ errorMessage: err.message });
     }
 
     res.redirect("/");
