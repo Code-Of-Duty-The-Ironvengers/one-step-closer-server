@@ -23,6 +23,7 @@ const MONGO_URI = require("../utils/consts");
 const cors = require("cors");
 
 const origin = process.env.ORIGIN || "http://localhost:3000";
+console.log("origin:", origin);
 
 // Middleware configuration
 module.exports = (app) => {
