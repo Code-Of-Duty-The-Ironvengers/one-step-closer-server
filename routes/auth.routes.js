@@ -157,6 +157,7 @@ router.post("/get-me", (req, res) => {
   const { token } = req.body;
 
   const { _id } = jwt.decode(token);
+  console.log(" jwt.decode(token):", jwt.decode(token));
   User.findById(_id).then((user) => res.json({ user }));
 });
 
