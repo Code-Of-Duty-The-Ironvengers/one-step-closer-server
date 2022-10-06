@@ -19,6 +19,7 @@ const isLoggedOut = require("../middleware/isLoggedOut");
 const isLoggedIn = require("../middleware/isLoggedIn");
 
 const jwt = require("jsonwebtoken");
+const goHomeYoureDrunk = require("../utils/go-home-youre-drunk");
 
 router.post("/signup", (req, res) => {
   const { username, password, email, name } = req.body;
@@ -152,13 +153,37 @@ router.post("/login", isLoggedOut, (req, res, next) => {
     });
 });
 
-router.post("/get-me", (req, res) => {
-  console.log(req.body);
-  const { token } = req.body;
+router.get("/get-me", (req, res) => {
+  // console.log(req.body);
+  // const { token } = req.body;
+  const headers = req.headers;
+  if (headers.authorization) {
+    const [bearer, token] = headers.authorization.split(" ");
 
-  const { _id } = jwt.decode(token);
-  console.log(" jwt.decode(token):", jwt.decode(token));
-  User.findById(_id).then((user) => res.json({ user }));
+    if (bearer !== "Bearer") {
+      // oh oh, this is bery bery bad
+    }
+
+    const tokenBack = jwt.decode(token);
+
+    if (!tokenBack) {
+      return goHomeYoureDrunk(res);
+    }
+
+    User.findById(tokenBack._id)
+      .then((user) => {
+        res.json({ user, token });
+      })
+      .catch((err) => {
+        console.log("err:", err);
+        return goHomeYoureDrunk(res, 500);
+      });
+  }
+  console.log("headers:", headers);
+
+  // const { _id } = jwt.decode(token);
+  // console.log(" jwt.decode(token):", jwt.decode(token));
+  // User.findById(_id).then((user) => res.json({ user }));
 });
 
 router.get("/logout", isLoggedIn, (req, res) => {
