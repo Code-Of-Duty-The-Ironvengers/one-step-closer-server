@@ -10,5 +10,6 @@ router.get("/", (req, res, next) => {
 
 router.use("/dashboard", dashboardRouter);
 router.use("/auth", authRoutes);
+router.use("/profile", require("./profile.routes"));
 
 module.exports = router;

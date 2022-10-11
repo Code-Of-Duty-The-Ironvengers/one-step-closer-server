@@ -1,4 +1,8 @@
-const router = require("express").Router();
+// const {Router} = require('express')
+// const router = Router()
+// const router = require("express").Router();
+const express = require("express");
+const router = express.Router();
 
 // ℹ️ Handles password encryption
 const bcrypt = require("bcrypt");
@@ -8,27 +12,34 @@ const mongoose = require("mongoose");
 const saltRounds = 10;
 
 // Require the User model in order to interact with the database
-const User = require("../models/User.model");
+const { User } = require("../models/User.model");
 
 // Require necessary (isLoggedOut and isLoggedIn) middleware in order to control access to specific routes
 const isLoggedOut = require("../middleware/isLoggedOut");
 const isLoggedIn = require("../middleware/isLoggedIn");
 
-router.get("/signup", isLoggedOut, (req, res) => {
-  res.render("auth/signup");
-});
+const jwt = require("jsonwebtoken");
+const goHomeYoureDrunk = require("../utils/go-home-youre-drunk");
 
-router.post("/signup", isLoggedOut, (req, res) => {
-  const { username, password } = req.body;
+router.post("/signup", (req, res) => {
+  const { username, password, email, name } = req.body;
+  console.log("username:", username);
 
   if (!username) {
-    return res.status(400).render("auth/signup", {
+    return res.status(400).json({
       errorMessage: "Please provide your username.",
     });
   }
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+  if (!emailRegex.test(email)) {
+    res.status(418).json({ errorMessage: "Provide a valid email address." });
+    return;
+  }
+
   if (password.length < 8) {
-    return res.status(400).render("auth/signup", {
+    return res.status(400).json({
       errorMessage: "Your password needs to be at least 8 characters long.",
     });
   }
@@ -38,7 +49,7 @@ router.post("/signup", isLoggedOut, (req, res) => {
   const regex = /(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}/;
 
   if (!regex.test(password)) {
-    return res.status(400).render("signup", {
+    return res.status(400).json({
       errorMessage:
         "Password needs to have at least 8 chars and must contain at least one number, one lowercase and one uppercase letter.",
     });
@@ -49,9 +60,7 @@ router.post("/signup", isLoggedOut, (req, res) => {
   User.findOne({ username }).then((found) => {
     // If the user is found, send the message username is taken
     if (found) {
-      return res
-        .status(400)
-        .render("auth/signup", { errorMessage: "Username already taken." });
+      return res.status(400).json({ errorMessage: "Username already taken." });
     }
 
     // if user is not found, create a new user - start with hashing the password
@@ -63,33 +72,34 @@ router.post("/signup", isLoggedOut, (req, res) => {
         return User.create({
           username,
           password: hashedPassword,
+          email,
+          name,
         });
       })
       .then((user) => {
         // Bind the user to the session object
-        req.session.user = user;
-        res.redirect("/");
+        const token = jwt.sign(
+          { _id: user._id, username: user.username },
+          process.env.TOKEN_SECRET,
+          { algorithm: "HS256", expiresIn: "12h" }
+        );
+        console.log("---------->", token);
+
+        res.json({ user, token });
       })
       .catch((error) => {
         if (error instanceof mongoose.Error.ValidationError) {
-          return res
-            .status(400)
-            .render("auth/signup", { errorMessage: error.message });
+          return res.status(400).json({ errorMessage: error.message });
         }
         if (error.code === 11000) {
-          return res
-            .status(400)
-            .render("auth/signup", { errorMessage: "Username need to be unique. The username you chose is already in use." });
+          return res.status(400).json({
+            errorMessage:
+              "Username need to be unique. The username you chose is already in use.",
+          });
         }
-        return res
-          .status(500)
-          .render("auth/signup", { errorMessage: error.message });
+        return res.status(500).json({ errorMessage: error.message });
       });
   });
-});
-
-router.get("/login", isLoggedOut, (req, res) => {
-  res.render("auth/login");
 });
 
 router.post("/login", isLoggedOut, (req, res, next) => {
@@ -98,15 +108,15 @@ router.post("/login", isLoggedOut, (req, res, next) => {
   if (!username) {
     return res
       .status(400)
-      .render("auth/login", { errorMessage: "Please provide your username." });
+      .json({ errorMessage: "Please provide your username." });
   }
 
   // Here we use the same logic as above
   // - either length based parameters or we check the strength of a password
   if (password.length < 8) {
-    return res
-      .status(400)
-      .render("auth/login", { errorMessage: "Your password needs to be at least 8 characters long." });
+    return res.status(400).json({
+      errorMessage: "Your password needs to be at least 8 characters long.",
+    });
   }
 
   // Search the database for a user with the username submitted in the form
@@ -114,22 +124,24 @@ router.post("/login", isLoggedOut, (req, res, next) => {
     .then((user) => {
       // If the user isn't found, send the message that user provided wrong credentials
       if (!user) {
-        return res
-          .status(400)
-          .render("auth/login", { errorMessage: "Wrong credentials." });
+        return res.status(400).json({ errorMessage: "Wrong credentials." });
       }
 
       // If user is found based on the username, check if the in putted password matches the one saved in the database
       bcrypt.compare(password, user.password).then((isSamePassword) => {
         if (!isSamePassword) {
-          return res
-            .status(400)
-            .render("auth/login", { errorMessage: "Wrong credentials." });
+          return res.status(400).json({ errorMessage: "Wrong credentials." });
         }
 
-        req.session.user = user;
+        const token = jwt.sign(
+          { _id: user._id, username: user.username },
+          process.env.TOKEN_SECRET,
+          { algorithm: "HS256", expiresIn: "12h" }
+        );
+        console.log("---------->", token);
+
+        res.json({ user, token });
         // req.session.user = user._id; // ! better and safer but in this case we saving the entire user object
-        return res.redirect("/");
       });
     })
 
@@ -137,18 +149,49 @@ router.post("/login", isLoggedOut, (req, res, next) => {
       // in this case we are sending the error handling to the error handling middleware that is defined in the error handling file
       // you can just as easily run the res.status that is commented out below
       next(err);
-      // return res.status(500).render("auth/login", { errorMessage: err.message });
+      // return res.status(500).json({ errorMessage: err.message });
     });
+});
+
+router.get("/get-me", (req, res) => {
+  // console.log(req.body);
+  // const { token } = req.body;
+  const headers = req.headers;
+  if (headers.authorization) {
+    const [bearer, token] = headers.authorization.split(" ");
+
+    if (bearer !== "Bearer") {
+      // oh oh, this is bery bery bad
+    }
+
+    const tokenBack = jwt.decode(token);
+
+    if (!tokenBack) {
+      return goHomeYoureDrunk(res);
+    }
+
+    User.findById(tokenBack._id)
+      .then((user) => {
+        res.json({ user, token });
+      })
+      .catch((err) => {
+        console.log("err:", err);
+        return goHomeYoureDrunk(res, 500);
+      });
+  }
+  console.log("headers:", headers);
+
+  // const { _id } = jwt.decode(token);
+  // console.log(" jwt.decode(token):", jwt.decode(token));
+  // User.findById(_id).then((user) => res.json({ user }));
 });
 
 router.get("/logout", isLoggedIn, (req, res) => {
   req.session.destroy((err) => {
     if (err) {
-      return res
-        .status(500)
-        .render("auth/logout", { errorMessage: err.message });
+      return res.status(500).json({ errorMessage: err.message });
     }
-    
+
     res.redirect("/");
   });
 });

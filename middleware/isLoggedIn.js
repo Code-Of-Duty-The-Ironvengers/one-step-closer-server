@@ -1,8 +1,31 @@
+const jwt = require("jsonwebtoken");
+const { User } = require("../models/User.model");
+const goHomeYoureDrunk = require("../utils/go-home-youre-drunk");
+
 module.exports = (req, res, next) => {
-  // checks if the user is logged in when trying to access a specific page
-  if (!req.session.user) {
-    return res.redirect("/auth/login");
+  if (!req.headers.authorization) {
+    return goHomeYoureDrunk(res);
   }
-  req.user = req.session.user;
-  next();
+
+  const [bearer, token] = req.headers.authorization.split(" ");
+
+  if (bearer !== "Bearer") {
+    return goHomeYoureDrunk(res);
+  }
+
+  const tokenData = jwt.decode(token);
+
+  if (!tokenData) {
+    return goHomeYoureDrunk(res);
+  }
+
+  User.findById(tokenData._id)
+    .then((user) => {
+      req.user = user;
+      next();
+    })
+    .catch((err) => {
+      console.log("err:", err);
+      return goHomeYoureDrunk(res, 500);
+    });
 };
