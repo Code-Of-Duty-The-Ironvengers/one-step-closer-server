@@ -1,5 +1,7 @@
 const BS_REQUEST = 400;
+const YOU_SHALL_NOT_PASS_FOCKERS = 404;
 
 module.exports = {
   BS_REQUEST,
+  YOU_SHALL_NOT_PASS_FOCKERS,
 };

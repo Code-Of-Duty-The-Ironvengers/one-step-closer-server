@@ -1,6 +1,12 @@
 const { Router } = require("express");
-const { addMonths } = require("date-fns");
+const { addMonths, isValid } = require("date-fns");
 const slugify = require("slugify");
+const isLoggedIn = require("../middleware/isLoggedIn");
+const { Goal } = require("../models/Goal.model");
+const {
+  BS_REQUEST,
+  YOU_SHALL_NOT_PASS_FOCKERS,
+} = require("../utils/status-codes");
 
 const dashboardRouter = Router();
 
@@ -29,10 +35,60 @@ dashboardRouter.get("/", (req, res) => {
   });
 });
 
-dashboardRouter.get("/:slug", (req, res) => {
-  const goal = FAKE_GOALS.find((goal) => goal.slug === req.params.slug);
+dashboardRouter.get("/:slug", isLoggedIn, (req, res) => {
+  const { slug } = req.params;
+  const { _id } = req.user;
+  Goal.findOne({ slug, owner: _id }).then((possibleGoal) => {
+    console.log("possibleGoal:", possibleGoal);
+    if (!possibleGoal) {
+      return res
+        .status(YOU_SHALL_NOT_PASS_FOCKERS)
+        .json({ errorMessage: "Syntax Error" });
+    }
 
-  res.json({ goal });
+    res.json(possibleGoal);
+  });
+});
+
+dashboardRouter.post("/create-goal", isLoggedIn, (req, res) => {
+  const { title = "", description, deadline: deadlineString } = req.body;
+
+  if (typeof title !== "string") {
+    return res.status(BS_REQUEST).json({ errorMessage: "Brock you fockers" });
+  }
+
+  if (title.length < 3 || title.length > 20) {
+    return res.status(BS_REQUEST).json({ errorMessage: "Brock you fockers" });
+  }
+
+  const deadline = new Date(deadlineString);
+
+  const validDeadline = isValid(deadline);
+
+  if (!validDeadline) {
+    return res.status(BS_REQUEST).json({ errorMessage: "Brock you fockers" });
+  }
+
+  const slug = slugify(title);
+
+  // VALIDATE THAT USER DOES NOT HAVE ANY GOAL WITH THIS TITLE
+  Goal.findOne({ owner: req.user._id, slug }).then((possibleGoal) => {
+    if (possibleGoal) {
+      return res
+        .status(BS_REQUEST)
+        .json({ errorMessage: "Brok you, but try again", code: 1, slug });
+    }
+
+    Goal.create({
+      title,
+      description,
+      deadline,
+      owner: req.user._id,
+      slug,
+    }).then((createdGoal) => {
+      res.json(createdGoal);
+    });
+  });
 });
 
 module.exports = dashboardRouter;

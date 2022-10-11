@@ -2,7 +2,7 @@ const jwt = require("jsonwebtoken");
 const { User } = require("../models/User.model");
 const goHomeYoureDrunk = require("../utils/go-home-youre-drunk");
 
-module.exports = (req, res, next) => {
+function isLoggedIn(req, res, next) {
   if (!req.headers.authorization) {
     return goHomeYoureDrunk(res);
   }
@@ -28,4 +28,6 @@ module.exports = (req, res, next) => {
       console.log("err:", err);
       return goHomeYoureDrunk(res, 500);
     });
-};
+}
+
+module.exports = isLoggedIn;
