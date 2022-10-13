@@ -10,34 +10,18 @@ const {
 
 const dashboardRouter = Router();
 
-const FAKE_GOALS = [
-  {
-    title: "Get a job",
-    description:
-      "Make money. I payed for the bootcamp and now my finances are in need of some love",
-    deadline: addMonths(new Date(), 2),
-    slug: slugify("Get a job", { lower: true }),
-  },
-  {
-    title: "Save money",
-    description:
-      "Save money. I payed for the bootcamp and now my finances are in need of some love",
-    deadline: new Date("2023-07-01"),
-    slug: slugify("Save money", {
-      lower: true,
-    }),
-  },
-];
-
-dashboardRouter.get("/", (req, res) => {
-  res.json({
-    goals: FAKE_GOALS,
+dashboardRouter.get("/", isLoggedIn, (req, res) => {
+  // Every single goal, by the user
+  Goal.find({ owner: req.user._id }).then((allGoals) => {
+    res.json(allGoals);
   });
 });
 
 dashboardRouter.get("/:slug", isLoggedIn, (req, res) => {
   const { slug } = req.params;
   const { _id } = req.user;
+  // Find One Goal, that has this slug: slug, and the owner has this value: _id
+  // Find One By That the req.user._id is the value for owner
   Goal.findOne({ slug, owner: _id }).then((possibleGoal) => {
     console.log("possibleGoal:", possibleGoal);
     if (!possibleGoal) {
