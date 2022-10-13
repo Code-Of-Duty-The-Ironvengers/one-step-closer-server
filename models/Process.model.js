@@ -1,6 +1,6 @@
 const { Schema, model } = require("mongoose");
 const { companyCollectionName } = require("./Company.model");
-const { stepCollectionName } = require("./Step.model");
+const { goalCollectionName } = require("./Goal.model");
 
 const processSchema = new Schema(
   {
@@ -14,9 +14,9 @@ const processSchema = new Schema(
       type: Boolean,
       default: false,
     },
-    status: {
+    goal: {
       type: Schema.Types.ObjectId,
-      ref: stepCollectionName,
+      ref: goalCollectionName,
     },
     notes: String,
     nextInteraction: {
@@ -28,6 +28,7 @@ const processSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: companyCollectionName,
     },
+    // Job Posting URL
     url: String,
   },
   {
@@ -36,6 +37,7 @@ const processSchema = new Schema(
   }
 );
 
-const Process = model("Process", processSchema);
+const processCollectionName = "Process";
+const Process = model(processCollectionName, processSchema);
 
-module.exports = Process;
+module.exports = { Process, processCollectionName };
