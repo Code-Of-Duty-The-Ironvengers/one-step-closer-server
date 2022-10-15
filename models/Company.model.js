@@ -1,4 +1,5 @@
 const { Schema, model } = require("mongoose");
+const { COMPANY_ENUM, MEH } = require("../utils/company-enum-data");
 
 const companySchema = new Schema(
   {
@@ -10,7 +11,8 @@ const companySchema = new Schema(
     },
     desireability: {
       type: String,
-      enum: ["Hell Nah", "Meh", "Please Say Yeh"],
+      enum: COMPANY_ENUM,
+      default: MEH,
     },
     website: String,
   },
